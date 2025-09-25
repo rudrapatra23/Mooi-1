@@ -1,89 +1,126 @@
 'use client'
+
 import { useEffect, useState } from "react"
-import { toast } from "react-hot-toast"
-import Image from "next/image"
-import Loading from "@/components/Loading"
-import { productDummyData } from "@/assets/assets"
-import { useAuth, useUser } from "@clerk/nextjs"
+import { useAuth } from "@clerk/nextjs"
 import axios from "axios"
+import toast from "react-hot-toast"
+import Loading from "@/components/Loading"
+import Link from "next/link"
 
-export default function StoreManageProducts() {
+export default function ManageProductsPage() {
+  const [products, setProducts] = useState(null) // null = not loaded yet
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [mounted, setMounted] = useState(false)
+  const { getToken, isLoaded } = useAuth()
 
-    const { getToken } = useAuth()
-    const { user } = useUser()
+  useEffect(() => setMounted(true), [])
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
-
-    const [loading, setLoading] = useState(true)
-    const [products, setProducts] = useState([])
-
-    const fetchProducts = async () => {
-        try {
-             const token = await getToken()
-             const { data } = await axios.get('/api/store/product', {headers: { Authorization: `Bearer ${token}` } })
-             setProducts(data.products.sort((a, b)=> new Date(b.createdAt) - new Date(a.createdAt)))
-        } catch (error) {
-            toast.error(error?.response?.data?.error || error.message)
-        }
-        setLoading(false)
+  const fetchProducts = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const token = await getToken()
+      if (!token) {
+        setError("Not authenticated — please sign in")
+        setProducts([])
+        return
+      }
+      const { data } = await axios.get("/api/store/product", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      // API ideally returns array or { products: [] }; handle both
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.products) ? data.products : [])
+      setProducts(list)
+    } catch (err) {
+      console.error("fetchProducts error:", err)
+      const msg = err?.response?.data?.error || err.message || "Failed to load products"
+      setError(msg)
+      setProducts([])
+    } finally {
+      setLoading(false)
     }
+  }
 
-    const toggleStock = async (productId) => {
-        try {
-            const token = await getToken()
-            const { data } = await axios.post('/api/store/stock-toggle',{ productId }, {headers: { Authorization: `Bearer ${token}` } })
-            setProducts(prevProducts => prevProducts.map(product =>  product.id === productId ? {...product, inStock: !product.inStock} : product))
+  useEffect(() => {
+    // wait until Clerk client is ready
+    if (!isLoaded) return
+    fetchProducts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded])
 
-            toast.success(data.message)
-        } catch (error) {
-            toast.error(error?.response?.data?.error || error.message)
-        }
+  const handleDelete = async (id) => {
+    if (!confirm("Delete this product?")) return
+
+    // optimistic UI
+    const before = products
+    setProducts(prev => prev.filter(p => p.id !== id))
+
+    try {
+      const token = await getToken()
+      await axios.delete(`/api/store/product?productId=${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      toast.success("Product deleted")
+    } catch (err) {
+      console.error("delete product error:", err)
+      toast.error(err?.response?.data?.error || err.message || "Failed to delete")
+      // rollback
+      setProducts(before)
     }
+  }
 
-    useEffect(() => {
-        if(user){
-            fetchProducts()
-        }  
-    }, [user])
+  const sortedProducts = Array.isArray(products)
+    ? [...products].sort((a, b) => {
+        // sort by createdAt desc, fallback to id
+        const ta = a?.createdAt ? new Date(a.createdAt).getTime() : 0
+        const tb = b?.createdAt ? new Date(b.createdAt).getTime() : 0
+        return tb - ta
+      })
+    : []
 
-    if (loading) return <Loading />
+  if (loading) return <Loading />
 
-    return (
-        <>
-            <h1 className="text-2xl text-slate-500 mb-5">Manage <span className="text-slate-800 font-medium">Products</span></h1>
-            <table className="w-full max-w-4xl text-left  ring ring-slate-200  rounded overflow-hidden text-sm">
-                <thead className="bg-slate-50 text-gray-700 uppercase tracking-wider">
-                    <tr>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3 hidden md:table-cell">Description</th>
-                        <th className="px-4 py-3 hidden md:table-cell">MRP</th>
-                        <th className="px-4 py-3">Price</th>
-                        <th className="px-4 py-3">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="text-slate-700">
-                    {products.map((product) => (
-                        <tr key={product.id} className="border-t border-gray-200 hover:bg-gray-50">
-                            <td className="px-4 py-3">
-                                <div className="flex gap-2 items-center">
-                                    <Image width={40} height={40} className='p-1 shadow rounded cursor-pointer' src={product.images[0]} alt="" />
-                                    {product.name}
-                                </div>
-                            </td>
-                            <td className="px-4 py-3 max-w-md text-slate-600 hidden md:table-cell truncate">{product.description}</td>
-                            <td className="px-4 py-3 hidden md:table-cell">{currency} {product.mrp.toLocaleString()}</td>
-                            <td className="px-4 py-3">{currency} {product.price.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-center">
-                                <label className="relative inline-flex items-center cursor-pointer text-gray-900 gap-3">
-                                    <input type="checkbox" className="sr-only peer" onChange={() => toast.promise(toggleStock(product.id), { loading: "Updating data..." })} checked={product.inStock} />
-                                    <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-green-600 transition-colors duration-200"></div>
-                                    <span className="dot absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-4"></span>
-                                </label>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </>
-    )
+  return (
+    <div className="max-w-5xl mx-auto p-4">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold">Manage Products</h1>
+        <Link href="/admin/add-product" className="px-4 py-2 bg-blue-600 text-white rounded">Add Product</Link>
+      </div>
+
+      {error && (
+        <div className="mb-4 text-red-600">
+          Error: {error}
+          <button onClick={fetchProducts} className="ml-4 text-sm underline">Retry</button>
+        </div>
+      )}
+
+      {!Array.isArray(products) || products.length === 0 ? (
+        <div className="rounded-md p-6 border border-gray-200 text-center">
+          {products === null ? "Loading…" : "No products found."}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {sortedProducts.map(p => (
+            <div key={p.id} className="flex items-center gap-4 p-4 border rounded shadow-sm">
+              <img src={p.images?.[0] || "/placeholder.png"} alt={p.name} className="w-20 h-20 object-cover rounded" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-medium">{p.name}</h2>
+                  <div className="text-sm text-gray-500">{mounted ? new Date(p.createdAt).toLocaleString() : new Date(p.createdAt).toISOString()}</div>
+                </div>
+                <p className="text-sm text-gray-600">{p.category} • ₹{p.price}</p>
+                <p className="text-xs text-gray-500 mt-1">{p.inStock ? "In stock" : "Out of stock"}</p>
+              </div>
+
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <Link href={`/admin/edit-product/${p.id}`} className="px-3 py-1 bg-yellow-200 rounded text-sm">Edit</Link>
+                <button onClick={() => handleDelete(p.id)} className="px-3 py-1 bg-red-500 text-white rounded text-sm">Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }

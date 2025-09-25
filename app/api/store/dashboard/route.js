@@ -1,36 +1,33 @@
 import prisma from "@/lib/prisma";
-import authSeller from "@/middlewares/authSeller";
 import { getAuth } from "@clerk/nextjs/server";
+import authAdmin from "@/middlewares/authAdmin";
 import { NextResponse } from "next/server";
 
+export async function GET(request) {
+  try {
+    const { userId } = getAuth(request);
+    const isAdmin = await authAdmin(userId);
 
-// Get Dashboard Data for Seller ( total orders, total earnings, total products )
-export async function GET(request){
-    try {
-        const { userId } = getAuth(request)
-        const storeId = await authSeller(userId)
-
-        // Get all orders for seller
-        const orders = await prisma.order.findMany({where: {storeId}})
-
-         // Get all products with ratings for seller
-         const products = await prisma.product.findMany({where: {storeId}})
-
-         const ratings = await prisma.rating.findMany({
-            where: {productId: {in: products.map(product => product.id)}},
-            include: {user: true, product: true}
-         })
-
-         const dashboardData = {
-            ratings,
-            totalOrders: orders.length,
-            totalEarnings: Math.round(orders.reduce((acc, order)=>  acc + order.total, 0)),
-            totalProducts: products.length
-         }
-
-         return NextResponse.json({ dashboardData });
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: error.code || error.message }, { status: 400 })
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
+
+    const orders = await prisma.order.count();
+    const stores = await prisma.store.count();
+    const products = await prisma.product.count();
+
+    const allOrders = await prisma.order.findMany({
+      select: { createdAt: true, total: true },
+    });
+
+    const totalRevenue = allOrders.reduce((acc, o) => acc + (o.total || 0), 0);
+    const revenue = totalRevenue.toFixed(2);
+
+    return NextResponse.json({
+      dashboardData: { orders, stores, products, revenue, allOrders },
+    });
+  } catch (error) {
+    console.error("GET /api/admin/dashboard error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
