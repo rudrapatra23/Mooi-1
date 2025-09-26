@@ -52,11 +52,6 @@ const Navbar = () => {
             <div className="relative h-12 w-[160px]">
               <Image src={logo} alt="logo" width={160} height={48} style={{ objectFit: 'contain' }} />
             </div>
-            <Protect plan="plus">
-              <span className="hidden md:inline-block text-xs font-semibold px-2 py-0.5 rounded-full text-white bg-green-500">
-                plus
-              </span>
-            </Protect>
           </Link>
 
           {/* Desktop menu: Home, Hair Care, Skin Care, About, Contact */}
@@ -64,23 +59,23 @@ const Navbar = () => {
             <nav className="flex items-center gap-6 text-slate-700">
               <Link href="/" className="relative group">
                 Home
-                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full" />
+                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-slate-700 transition-all group-hover:w-full" />
               </Link>
               <Link href="/shop?category=hair-care" className="relative group">
                 Hair Care
-                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full" />
+                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-slate-700 transition-all group-hover:w-full" />
               </Link>
               <Link href="/shop?category=skin-care" className="relative group">
                 Skin Care
-                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full" />
+                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-slate-700 transition-all group-hover:w-full" />
               </Link>
               <Link href="/about" className="relative group">
                 About
-                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full" />
+                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-slate-700 transition-all group-hover:w-full" />
               </Link>
               <Link href="/contact" className="relative group">
                 Contact
-                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full" />
+                <span className="absolute left-0 -bottom-1 w-0 h-0.5 bg-slate-700 transition-all group-hover:w-full" />
               </Link>
             </nav>
 
